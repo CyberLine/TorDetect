@@ -72,7 +72,7 @@ class TorDetect
      */
     private function dnsGetRecord($address)
     {
-        if (!function_exists('dns_get_record') and !function_exists('exec')) {
+        if (!function_exists('dns_get_record') && !function_exists('exec')) {
             throw new \LogicException(
                 'no suitable methods for dns fetching found'
             );
@@ -86,14 +86,14 @@ class TorDetect
         $retval = false;
         if (strtoupper(substr(PHP_OS, 0, 3)) == 'WIN') {
             @exec('nslookup -type A ' . $address, $output, $retval);
-            if (!$retval and array_key_exists(1, $output)) {
+            if (!$retval && array_key_exists(1, $output)) {
                 $output[0] = $output[1];
             }
         } else {
             @exec('host ' . $address, $output, $retval);
         }
 
-        if (!$retval and array_key_exists(0, $output)) {
+        if (!$retval && array_key_exists(0, $output)) {
             $explode = explode(' ', $output[0]);
             $result = $explode[count($explode) - 1];
             if (filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
@@ -145,7 +145,7 @@ class TorDetect
      */
     private function checkRecord($dns)
     {
-        if (array_key_exists(0, $dns) and array_key_exists('ip', $dns[0])) {
+        if (array_key_exists(0, $dns) && array_key_exists('ip', $dns[0])) {
             return ($dns[0]['ip'] == '127.0.0.2');
         }
         return false;
