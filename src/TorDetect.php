@@ -39,15 +39,17 @@ class TorDetect
      */
     private function __construct()
     {
-        $this->target = implode(
-            '.',
-            array_reverse(
-                explode(
-                    '.',
-                    $_SERVER['REMOTE_ADDR']
+        if (isset($_SERVER) && array_key_exists('REMOTE_ADDR', $_SERVER)) {
+            $this->target = implode(
+                '.',
+                array_reverse(
+                    explode(
+                        '.',
+                        $_SERVER['REMOTE_ADDR']
+                    )
                 )
-            )
-        );
+            );
+        }
 
         $this->exithost = implode(
             '.',
@@ -164,7 +166,7 @@ class TorDetect
                 'ip-port.exitlist.torproject.org'
             );
 
-            $dns = $this->dnsGetRecord(implode('.', $query));
+            $dns = $this->dnsGetRecord($query);
             $isActive = $this->checkRecord($dns);
 
             $this->cache[$this->target] = $isActive;
