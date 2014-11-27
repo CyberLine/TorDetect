@@ -68,11 +68,11 @@ class TorDetect
      * Wrapper for windows < 5.3 and, theoretically for
      * linux without dns_get_record() function
      *
-     * @param $address
+     * @param array $address
      *
      * @return array
      */
-    private function dnsGetRecord($address)
+    private function dnsGetRecord(array $address)
     {
         if (!function_exists('dns_get_record') && !function_exists('exec')) {
             throw new \LogicException(
@@ -80,8 +80,9 @@ class TorDetect
             );
         }
 
+        $address = implode('.', $address);
         if (function_exists('dns_get_record')) {
-            return dns_get_record(implode('.', $address), DNS_A);
+            return dns_get_record($address, DNS_A);
         }
 
         $output = $dns = array();
