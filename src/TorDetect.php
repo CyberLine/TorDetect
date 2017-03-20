@@ -17,17 +17,17 @@ class TorDetect
     /**
      * @var string
      */
-    private $target;
+    private $target = null;
 
     /**
      * @var string
      */
-    private $exithost;
+    private $exithost = null;
 
     /**
      * @var integer
      */
-    private $port;
+    private $port = 443;
 
     /**
      * @var array
@@ -40,28 +40,101 @@ class TorDetect
     private function __construct()
     {
         if (isset($_SERVER) && array_key_exists('REMOTE_ADDR', $_SERVER)) {
-            $this->target = implode(
-                '.',
-                array_reverse(
-                    explode(
-                        '.',
-                        $_SERVER['REMOTE_ADDR']
-                    )
-                )
+            $this->setTarget($_SERVER['REMOTE_ADDR']);
+        }
+
+        if (isset($_SERVER) && array_key_exists('SERVER_ADDR', $_SERVER)) {
+            $this->setExithost($_SERVER["SERVER_ADDR"]);
+            $this->setPort($_SERVER["SERVER_PORT"]);
+        }
+    }
+
+    /**
+     * @param $target
+     *
+     * @return $this
+     * @throws \InvalidArgumentException
+     */
+    public function setTarget($target)
+    {
+        if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $this->target = implode('.', array_reverse(explode('.', $target)));
+        } else {
+            throw new \InvalidArgumentException(
+                sprintf('"%s" is not a valid value for target', $target)
             );
         }
 
-        $this->exithost = implode(
-            '.',
-            array_reverse(
-                explode(
-                    '.',
-                    $_SERVER["SERVER_ADDR"]
-                )
-            )
+        return $this;
+    }
+
+    /**
+     * @param $exithost
+     * @return $this
+     */
+    public function setExithost($exithost)
+    {
+        $this->exithost = $this->prepareExithost($exithost);
+
+        return $this;
+    }
+
+    /**
+     * @param integer $port
+     * @return $this
+     */
+    public function setPort($port)
+    {
+        $this->port = intval($port);
+
+        return $this;
+    }
+
+    /**
+     * @return object|TorDetect
+     */
+    public static function getInstance()
+    {
+        if (!(self::$instance instanceof self)) {
+            self::$instance = new self;
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function isTorActive()
+    {
+        if (null === $this->target) {
+            throw new \InvalidArgumentException('No target set. Use setTarget($ip) first.');
+        }
+
+        if (!array_key_exists($this->target, $this->cache)) {
+            $this->doFreshCheck();
+        }
+
+        return $this->cache[$this->target];
+    }
+
+    private function doFreshCheck()
+    {
+        if (null === $this->exithost) {
+            throw new \InvalidArgumentException('No exithost set. Use setExithost($host) first.');
+        }
+
+        $query = array(
+            $this->target,
+            $this->port,
+            $this->exithost,
+            'ip-port.exitlist.torproject.org'
         );
 
-        $this->port = $_SERVER["SERVER_PORT"];
+        $dns = $this->dnsGetRecord($query);
+        $isActive = $this->checkRecord($dns);
+
+        $this->cache[$this->target] = $isActive;
     }
 
     /**
@@ -85,6 +158,15 @@ class TorDetect
             return dns_get_record($address, DNS_A);
         }
 
+        return $this->doFallbackCheck($address);
+    }
+
+    /**
+     * @param string $address
+     * @return array
+     */
+    private function doFallbackCheck($address)
+    {
         $output = $dns = array();
         $retval = false;
         if (strtoupper(substr(PHP_OS, 0, 3)) == 'WIN') {
@@ -109,70 +191,24 @@ class TorDetect
     }
 
     /**
-     * @return object|TorDetect
-     */
-    public static function getInstance()
-    {
-        if (!(self::$instance instanceof self)) {
-            self::$instance = new self;
-        }
-
-        return self::$instance;
-    }
-
-    /**
-     * @param $target
-     *
-     * @return $this
-     * @throws \InvalidArgumentException
-     */
-    public function setTarget($target)
-    {
-        if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $this->target = implode('.', array_reverse(explode('.', $target)));
-        } else {
-            throw new \InvalidArgumentException(
-                sprintf(
-                    '"%s" is not a valid value for target',
-                    $target
-                )
-            );
-        }
-
-        return $this;
-    }
-
-    /**
      * @param $dns
      * @return bool
      */
     private function checkRecord($dns)
     {
         if (array_key_exists(0, $dns) && array_key_exists('ip', $dns[0])) {
-            return ($dns[0]['ip'] == '127.0.0.2');
+            return ($dns[0]['ip'] === '127.0.0.2');
         }
+
         return false;
     }
 
     /**
-     * @return mixed
+     * @param string $exithost
+     * @return string
      */
-    public function isTorActive()
+    private function prepareExithost($exithost)
     {
-        if (!array_key_exists($this->target, $this->cache)) {
-            $query = array(
-                $this->target,
-                $this->port,
-                $this->exithost,
-                'ip-port.exitlist.torproject.org'
-            );
-
-            $dns = $this->dnsGetRecord($query);
-            $isActive = $this->checkRecord($dns);
-
-            $this->cache[$this->target] = $isActive;
-        }
-
-        return $this->cache[$this->target];
+        return implode('.', array_reverse(explode('.', $exithost)));
     }
 }
